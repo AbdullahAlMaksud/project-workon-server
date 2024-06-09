@@ -26,7 +26,20 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
 
+        const usersCollection = client.db('workonDB').collection('users')
 
+
+        app.get('/users', async (req, res) => {
+            const result = await usersCollection.find().toArray();
+            // console.log(result)
+            res.send(result)
+        })
+        app.post('/users', async (req, res) => {
+            const data = req.body;
+            const result = await usersCollection.insertOne(data)
+            console.log(result)
+            res.send(result)
+        })
 
 
 
