@@ -24,9 +24,19 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         const usersCollection = client.db('workonDB').collection('users');
+        const tasksCollection = client.db('workonDB').collection('tasks');
+        const paymentsCollection = client.db('workonDB').collection('payments');
 
+
+        // User routes
         app.get('/users', async (req, res) => {
             const result = await usersCollection.find().toArray();
+            res.send(result);
+        });
+
+
+        app.get('/employees', async (req, res) => {
+            const result = await usersCollection.find({ role: 'employee' }).toArray();
             res.send(result);
         });
 
@@ -44,6 +54,95 @@ async function run() {
                 res.send(result);
             }
         });
+
+        app.get('/user/role', async (req, res) => {
+            const email = req.query.email;
+            if (!email) {
+                res.status(400).send({ message: 'Email query parameter is required' });
+                return;
+            }
+
+            const user = await usersCollection.findOne({ email: email });
+            if (!user) {
+                res.status(404).send({ message: 'User not found' });
+                return;
+            }
+
+            res.send({ role: user.role });
+        });
+
+        // Task routes
+        app.get('/tasks', async (req, res) => {
+            const result = await tasksCollection.find().toArray();
+            res.send(result);
+        });
+
+        app.post('/tasks', async (req, res) => {
+            const data = req.body;
+            const result = await tasksCollection.insertOne(data);
+            res.send(result);
+        });
+
+        // Payment history route
+        app.get('/payment-history', async (req, res) => {
+            const result = await paymentsCollection.find().sort({ date: -1 }).toArray();
+            res.send(result);
+        });
+
+        // Verification route
+        app.post('/users/verify/:id', async (req, res) => {
+            const userId = req.params.id;
+            const user = await usersCollection.findOne({ _id: new MongoClient.ObjectId(userId) });
+
+            if (!user) {
+                res.status(404).send({ message: 'User not found' });
+                return;
+            }
+
+            const updatedUser = await usersCollection.updateOne(
+                { _id: new MongoClient.ObjectId(userId) },
+                { $set: { isVerified: !user.isVerified } }
+            );
+
+            res.send(updatedUser);
+        });
+
+
+        app.post('/users/pay', async (req, res) => {
+            const { userId, amount, month, year } = req.body;
+
+            // Prevent duplicate payments for the same month/year
+            const existingPayment = await paymentsCollection.findOne({ userId, month, year });
+            if (existingPayment) {
+                res.status(409).send({ message: 'Payment already exists for this period' });
+                return;
+            }
+
+            const payment = {
+                userId,
+                amount,
+                month,
+                year,
+                date: new Date(),
+            };
+            const result = await paymentsCollection.insertOne(payment);
+            res.send(result);
+        });
+
+        app.get('/users/:id', async (req, res) => {
+            const userId = req.params.id;
+            const user = await usersCollection.findOne({ _id: new MongoClient.ObjectId(userId) });
+            if (!user) {
+                res.status(404).send({ message: 'User not found' });
+                return;
+            }
+
+            const payments = await paymentsCollection.find({ userId }).toArray();
+            res.send({ user, payments });
+        });
+
+
+
 
         // Connect the client to the server (optional starting in v4.7)
         // await client.connect();
