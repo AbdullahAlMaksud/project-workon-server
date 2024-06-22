@@ -32,6 +32,7 @@ async function run() {
         const service = db.collection('service');
         const testimonial = db.collection('testimonial');
 
+
         //Simple Get Endpoint
         app.get('/carousel', async (req, res) => {
             const result = await carousel.find().toArray();
@@ -262,6 +263,20 @@ async function run() {
             } catch (error) {
                 console.error('Error fetching employees and HR:', error);
                 res.status(500).send({ message: 'Error fetching employees and HR' });
+            }
+        });
+        app.get('/all-employees-list/:id', async (req, res) => {
+            const userId = req.params.id;
+            try {
+                const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+
+                if (!user) {
+                    return res.status(404).send({ message: 'User not found' });
+                }
+                res.send(user);
+            } catch (error) {
+                console.error('Error fetching user:', error);
+                res.status(500).send({ message: 'Error fetching user' });
             }
         });
         //For Role Changing by Admin
