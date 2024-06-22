@@ -32,8 +32,6 @@ async function run() {
         const service = db.collection('service');
         const testimonial = db.collection('testimonial');
 
-
-
         //Simple Get Endpoint
         app.get('/carousel', async (req, res) => {
             const result = await carousel.find().toArray();
@@ -55,30 +53,43 @@ async function run() {
             const result = await usersCollection.find().toArray();
             res.send(result);
         });
-        app.get('/tasks', async (req, res) => {
-            const result = await tasksCollection.find().toArray();
-            res.send(result);
-        });
-        app.get('/all-employees-list/:id', async (req, res) => {
-            const userId = req.params.id;
+        app.get('/tasks/:userEmail', async (req, res) => {
+            const userEmail = req.params.userEmail;
             try {
-                const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
-
-                if (!user) {
-                    return res.status(404).send({ message: 'User not found' });
-                }
-                res.send(user);
+                const tasks = await tasksCollection.find({ userEmail: userEmail }).sort({ date: -1 }).toArray();
+                res.send(tasks);
             } catch (error) {
-                console.error('Error fetching user:', error);
-                res.status(500).send({ message: 'Error fetching user' });
+                console.error('Error fetching tasks:', error);
+                res.status(500).send({ message: 'Error fetching tasks' });
+            }
+        });
+        app.get('/payment-history/:email', async (req, res) => {
+            const email = req.params.email;
+            try {
+                const result = await paymentsCollection.find({ userEmail: email }).sort({ date: -1 }).toArray();
+                res.send(result);
+            } catch (error) {
+                console.error('Error fetching payment history:', error);
+                res.status(500).send({ message: 'Error fetching payment history' });
             }
         });
 
 
+        // POST route to add a task for a specific user
+        app.post('/tasks', async (req, res) => {
+            const taskData = req.body;
+            try {
+                const result = await tasksCollection.insertOne(taskData);
+                res.status(201).send(result.ops[0]); // Return the inserted task
+            } catch (error) {
+                console.error('Error adding task:', error);
+                res.status(500).send({ message: 'Error adding task' });
+            }
+        });
+
         app.patch('/employee-update/:id', async (req, res) => {
             const userId = req.params.id;
             const updateData = req.body;
-
             try {
                 const result = await usersCollection.updateOne(
                     { _id: new ObjectId(userId) },
@@ -114,7 +125,6 @@ async function run() {
                 res.send(result);
             }
         });
-
         app.get('/user/role', async (req, res) => {
             const email = req.query.email;
             if (!email) {
@@ -128,22 +138,7 @@ async function run() {
             }
             res.send({ role: user.role });
         });
-
         // Task Post by Employee Endpoint
-        app.post('/tasks', async (req, res) => {
-            const data = req.body;
-            const result = await tasksCollection.insertOne(data);
-            res.send(result);
-        });
-
-
-
-        // Payment history route
-        app.get('/payment-history', async (req, res) => {
-            const result = await paymentsCollection.find().sort({ date: -1 }).toArray();
-            res.send(result);
-        });
-
         // Verification route
         app.post('/users/verify/:id', async (req, res) => {
             const userId = req.params.id;
@@ -161,7 +156,6 @@ async function run() {
 
             res.send(updatedUser);
         });
-
         app.post('/users/pay', async (req, res) => {
             const { userId, amount, month, year } = req.body;
 
@@ -181,7 +175,6 @@ async function run() {
             const result = await paymentsCollection.insertOne(payment);
             res.send(result);
         });
-
         app.get('/users/:id', async (req, res) => {
             const userId = req.params.id;
             const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
@@ -193,13 +186,11 @@ async function run() {
             const payments = await paymentsCollection.find({ userId }).toArray();
             res.send({ user, payments });
         });
-
         // Endpoint to fetch employee list with verification and payment status
         app.get('/employee-list', async (req, res) => {
             const result = await usersCollection.find({ role: 'employee' }).toArray();
             res.send(result);
         });
-
         // Endpoint to update verification status
         app.put('/employee/verify/:id', async (req, res) => {
             const id = req.params.id;
@@ -212,7 +203,6 @@ async function run() {
             const result = await usersCollection.updateOne(filter, updateDoc);
             res.send(result);
         });
-
         // Endpoint to update payment status
         app.put('/employee/pay/:id', async (req, res) => {
             const id = req.params.id;
@@ -225,13 +215,11 @@ async function run() {
             const result = await usersCollection.updateOne(filter, updateDoc);
             res.send(result);
         });
-
         // Endpoint to fetch all employees
         app.get('/employees', async (req, res) => {
             const employees = await usersCollection.find({ role: 'employee' }).toArray();
             res.send(employees);
         });
-
         // Get work records with filtering
         app.get('/work-records', async (req, res) => {
             const { employeeName, month } = req.query;
@@ -256,7 +244,6 @@ async function run() {
             const result = await tasksCollection.find(query).toArray();
             res.send(result);
         });
-
         app.patch('/work-records/:id', async (req, res) => {
             const id = req.params.id;
             const updates = req.body;
@@ -266,10 +253,6 @@ async function run() {
             );
             res.send(result);
         });
-
-
-
-
         // Get All Verified Employee and Hr List for Admin
         app.get('/all-employee-list', async (req, res) => {
             try {
@@ -281,7 +264,6 @@ async function run() {
                 res.status(500).send({ message: 'Error fetching employees and HR' });
             }
         });
-
         //For Role Changing by Admin
         app.patch('/users/:id/role', async (req, res) => {
             const userId = req.params.id;
@@ -300,8 +282,6 @@ async function run() {
                 res.status(500).send({ message: 'Error updating user role' });
             }
         });
-
-
         ///////////////////////////////////////////////////////////////////
         app.delete('/users/:id', async (req, res) => {
             const userId = req.params.id;
@@ -319,9 +299,6 @@ async function run() {
                 res.status(500).send({ message: 'Error deleting user' });
             }
         });
-
-
-
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensure the client will close when you finish/error
