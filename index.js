@@ -59,6 +59,43 @@ async function run() {
             const result = await tasksCollection.find().toArray();
             res.send(result);
         });
+        app.get('/all-employees-list/:id', async (req, res) => {
+            const userId = req.params.id;
+            try {
+                const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+
+                if (!user) {
+                    return res.status(404).send({ message: 'User not found' });
+                }
+                res.send(user);
+            } catch (error) {
+                console.error('Error fetching user:', error);
+                res.status(500).send({ message: 'Error fetching user' });
+            }
+        });
+
+
+        app.patch('/employee-update/:id', async (req, res) => {
+            const userId = req.params.id;
+            const updateData = req.body;
+
+            try {
+                const result = await usersCollection.updateOne(
+                    { _id: new ObjectId(userId) },
+                    { $set: updateData }
+                );
+
+                if (result.modifiedCount === 0) {
+                    return res.status(404).send({ message: 'User not found or no changes made' });
+                }
+
+                res.send({ message: 'User data updated successfully' });
+            } catch (error) {
+                console.error('Error updating user:', error);
+                res.status(500).send({ message: 'Error updating user' });
+            }
+        });
+
 
 
         /////////////////////////////////////////////////
