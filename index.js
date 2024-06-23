@@ -247,7 +247,7 @@ async function run() {
             res.send(updatedUser);
         });
         app.post('/users/pay', async (req, res) => {
-            const { userId, amount, month, year } = req.body;
+            const { userId, amount, month, year, userName, userEmail, status } = req.body;
 
             const existingPayment = await paymentsCollection.findOne({ userId, month, year });
             if (existingPayment) {
@@ -261,6 +261,9 @@ async function run() {
                 month,
                 year,
                 date: new Date(),
+                userName,
+                userEmail,
+                status
             };
             const result = await paymentsCollection.insertOne(payment);
             res.send(result);
