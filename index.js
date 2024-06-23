@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-
 const port = process.env.PORT || 5000;
 const app = express();
 
@@ -12,7 +11,6 @@ app.use(cors());
 
 // MongoDB
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.sy9sfbb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
@@ -27,6 +25,7 @@ async function run() {
         const usersCollection = db.collection('users');
         const tasksCollection = db.collection('tasks');
         const paymentsCollection = db.collection('payments');
+
         const carousel = db.collection('carousel');
         const feature = db.collection('feature');
         const service = db.collection('service');
@@ -88,6 +87,7 @@ async function run() {
             }
         });
 
+        //PATCH route to update data
         app.patch('/employee-update/:id', async (req, res) => {
             const userId = req.params.id;
             const updateData = req.body;
@@ -110,21 +110,10 @@ async function run() {
 
 
 
-        /////////////////////////////////////////////////
-
+        ////////////////////////////////////////////////////////////////GET
         app.get('/employees', async (req, res) => {
             const result = await usersCollection.find({ role: 'employee' }).toArray();
             res.send(result);
-        });
-        app.post('/users', async (req, res) => {
-            const data = req.body;
-            const existingUser = await usersCollection.findOne({ email: data.email });
-            if (existingUser) {
-                res.status(409).send({ message: 'User already exists' });
-            } else {
-                const result = await usersCollection.insertOne(data);
-                res.send(result);
-            }
         });
         app.get('/user/role', async (req, res) => {
             const email = req.query.email;
@@ -139,6 +128,77 @@ async function run() {
             }
             res.send({ role: user.role });
         });
+        app.get('/users/:id', async (req, res) => {
+            const userId = req.params.id;
+            const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+            if (!user) {
+                res.status(404).send({ message: 'User not found' });
+                return;
+            }
+
+            const payments = await paymentsCollection.find({ userId }).toArray();
+            res.send({ user, payments });
+        });
+        // Endpoint to fetch employee list with verification and payment status
+        app.get('/employee-list', async (req, res) => {
+            const result = await usersCollection.find({ role: 'employee' }).toArray();
+            res.send(result);
+        });
+        // Endpoint to fetch all employees
+        app.get('/employees', async (req, res) => {
+            const employees = await usersCollection.find({ role: 'employee' }).toArray();
+            res.send(employees);
+        });
+        // Get work records with filtering
+        app.get('/work-records', async (req, res) => {
+            const { employeeName, month } = req.query;
+            const query = {};
+
+            if (employeeName) {
+                const user = await tasksCollection.findOne({ name: employeeName });
+                if (user) {
+                    query.userEmail = user.email;
+                } else {
+                    return res.status(404).send({ message: 'Employee not found' });
+                }
+            }
+
+            if (month) {
+                const startDate = new Date(`${month}-01`);
+                const endDate = new Date(startDate);
+                endDate.setMonth(startDate.getMonth() + 1);
+                query.date = { $gte: startDate, $lt: endDate };
+            }
+
+            const result = await tasksCollection.find(query).toArray();
+            res.send(result);
+        });
+        // Get All Verified Employee and Hr List for Admin
+        app.get('/all-employee-list', async (req, res) => {
+            try {
+                const roles = ['employee', 'hr'];
+                const users = await usersCollection.find({ role: { $in: roles }, isVerified: true }).toArray();
+                res.send(users);
+            } catch (error) {
+                console.error('Error fetching employees and HR:', error);
+                res.status(500).send({ message: 'Error fetching employees and HR' });
+            }
+        });
+        app.get('/all-employees-list/:id', async (req, res) => {
+            const userId = req.params.id;
+            try {
+                const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+
+                if (!user) {
+                    return res.status(404).send({ message: 'User not found' });
+                }
+                res.send(user);
+            } catch (error) {
+                console.error('Error fetching user:', error);
+                res.status(500).send({ message: 'Error fetching user' });
+            }
+        });
+        ///////////////////////////////////////////////////////////////////POST
         // Task Post by Employee Endpoint
         // Verification route
         app.post('/users/verify/:id', async (req, res) => {
@@ -176,22 +236,17 @@ async function run() {
             const result = await paymentsCollection.insertOne(payment);
             res.send(result);
         });
-        app.get('/users/:id', async (req, res) => {
-            const userId = req.params.id;
-            const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
-            if (!user) {
-                res.status(404).send({ message: 'User not found' });
-                return;
+        app.post('/users', async (req, res) => {
+            const data = req.body;
+            const existingUser = await usersCollection.findOne({ email: data.email });
+            if (existingUser) {
+                res.status(409).send({ message: 'User already exists' });
+            } else {
+                const result = await usersCollection.insertOne(data);
+                res.send(result);
             }
-
-            const payments = await paymentsCollection.find({ userId }).toArray();
-            res.send({ user, payments });
         });
-        // Endpoint to fetch employee list with verification and payment status
-        app.get('/employee-list', async (req, res) => {
-            const result = await usersCollection.find({ role: 'employee' }).toArray();
-            res.send(result);
-        });
+        //////////////////////////////////////////////////////////////////UPDATE
         // Endpoint to update verification status
         app.put('/employee/verify/:id', async (req, res) => {
             const id = req.params.id;
@@ -216,35 +271,6 @@ async function run() {
             const result = await usersCollection.updateOne(filter, updateDoc);
             res.send(result);
         });
-        // Endpoint to fetch all employees
-        app.get('/employees', async (req, res) => {
-            const employees = await usersCollection.find({ role: 'employee' }).toArray();
-            res.send(employees);
-        });
-        // Get work records with filtering
-        app.get('/work-records', async (req, res) => {
-            const { employeeName, month } = req.query;
-            const query = {};
-
-            if (employeeName) {
-                const user = await tasksCollection.findOne({ name: employeeName });
-                if (user) {
-                    query.userEmail = user.email;
-                } else {
-                    return res.status(404).send({ message: 'Employee not found' });
-                }
-            }
-
-            if (month) {
-                const startDate = new Date(`${month}-01`);
-                const endDate = new Date(startDate);
-                endDate.setMonth(startDate.getMonth() + 1);
-                query.date = { $gte: startDate, $lt: endDate };
-            }
-
-            const result = await tasksCollection.find(query).toArray();
-            res.send(result);
-        });
         app.patch('/work-records/:id', async (req, res) => {
             const id = req.params.id;
             const updates = req.body;
@@ -253,31 +279,6 @@ async function run() {
                 { $set: updates }
             );
             res.send(result);
-        });
-        // Get All Verified Employee and Hr List for Admin
-        app.get('/all-employee-list', async (req, res) => {
-            try {
-                const roles = ['employee', 'hr'];
-                const users = await usersCollection.find({ role: { $in: roles }, isVerified: true }).toArray();
-                res.send(users);
-            } catch (error) {
-                console.error('Error fetching employees and HR:', error);
-                res.status(500).send({ message: 'Error fetching employees and HR' });
-            }
-        });
-        app.get('/all-employees-list/:id', async (req, res) => {
-            const userId = req.params.id;
-            try {
-                const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
-
-                if (!user) {
-                    return res.status(404).send({ message: 'User not found' });
-                }
-                res.send(user);
-            } catch (error) {
-                console.error('Error fetching user:', error);
-                res.status(500).send({ message: 'Error fetching user' });
-            }
         });
         //For Role Changing by Admin
         app.patch('/users/:id/role', async (req, res) => {
@@ -297,7 +298,8 @@ async function run() {
                 res.status(500).send({ message: 'Error updating user role' });
             }
         });
-        ///////////////////////////////////////////////////////////////////
+
+        ///////////////////////////////////////////////////////////////////DELETE
         app.delete('/users/:id', async (req, res) => {
             const userId = req.params.id;
 
@@ -314,6 +316,9 @@ async function run() {
                 res.status(500).send({ message: 'Error deleting user' });
             }
         });
+
+
+
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensure the client will close when you finish/error
