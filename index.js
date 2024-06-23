@@ -73,7 +73,16 @@ async function run() {
                 res.status(500).send({ message: 'Error fetching payment history' });
             }
         });
-
+        app.get('/all-employee-list', async (req, res) => {
+            try {
+                const roles = ['employee', 'hr', null];
+                const users = await usersCollection.find({ role: { $in: roles }, isVerified: true }).toArray();
+                res.send(users);
+            } catch (error) {
+                console.error('Error fetching employees and HR:', error);
+                res.status(500).send({ message: 'Error fetching employees and HR' });
+            }
+        });
 
         // POST route to add a task for a specific user
         app.post('/tasks', async (req, res) => {
@@ -86,6 +95,7 @@ async function run() {
                 res.status(500).send({ message: 'Error adding task' });
             }
         });
+
 
         //PATCH route to update data
         app.patch('/employee-update/:id', async (req, res) => {
@@ -107,6 +117,35 @@ async function run() {
                 res.status(500).send({ message: 'Error updating user' });
             }
         });
+        // PATCH route to fire employee by ID
+        app.patch('/employee/fire/:id', async (req, res) => {
+            const userId = req.params.id;
+            try {
+                const result = await usersCollection.updateOne(
+                    { _id: new ObjectId(userId) },
+                    {
+                        $set: {
+                            role: null,
+                            phoneNumber: null,
+                            bank_account_no: null,
+                            salary: null,
+                            designation: null,
+                            status: 'fired',
+                        },
+                    }
+                );
+
+                if (result.modifiedCount === 0) {
+                    return res.status(404).json({ message: 'Employee not found' });
+                }
+
+                res.status(200).json({ message: 'Employee fired successfully' });
+            } catch (error) {
+                console.error('Error firing employee:', error);
+                res.status(500).json({ message: 'Server error', error });
+            }
+        });
+
 
 
 
@@ -173,17 +212,7 @@ async function run() {
             const result = await tasksCollection.find(query).toArray();
             res.send(result);
         });
-        // Get All Verified Employee and Hr List for Admin
-        app.get('/all-employee-list', async (req, res) => {
-            try {
-                const roles = ['employee', 'hr'];
-                const users = await usersCollection.find({ role: { $in: roles }, isVerified: true }).toArray();
-                res.send(users);
-            } catch (error) {
-                console.error('Error fetching employees and HR:', error);
-                res.status(500).send({ message: 'Error fetching employees and HR' });
-            }
-        });
+
         app.get('/all-employees-list/:id', async (req, res) => {
             const userId = req.params.id;
             try {
@@ -302,7 +331,6 @@ async function run() {
         ///////////////////////////////////////////////////////////////////DELETE
         app.delete('/users/:id', async (req, res) => {
             const userId = req.params.id;
-
             try {
                 const result = await usersCollection.deleteOne({ _id: new MongoClient.ObjectId(userId) });
 
@@ -316,6 +344,9 @@ async function run() {
                 res.status(500).send({ message: 'Error deleting user' });
             }
         });
+
+
+
 
 
 
